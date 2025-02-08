@@ -55,7 +55,7 @@ async def start(update: Update, context: CallbackContext):
         "*Owner*: @GODxAloneBOY\n"
         f"🔔 *Join our channel*: {CHANNEL_ID} to use advanced features.\n\n"
         "Use /help to see available commands.\n\n"
-        "Image: [Click Here](https://t.me/jwhu7hwbsnn/122)"
+        " [https://t.me/jwhu7hwbsnn/122]"
     )
     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
 
