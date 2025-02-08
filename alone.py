@@ -93,12 +93,30 @@ async def help_command(update: Update, context: CallbackContext):
         "*Available Commands:*\n\n"
         "/start - Start the bot and get a welcome message.\n"
         "/help - Show this help message.\n"
-        "/approve <id> <duration> - Approve a user or group ID for a specified time (admin only).\n"
+        "/approve <id> - Approve a user or group ID (admin only).\n"
         "/remove <id> - Remove a user or group ID (admin only).\n"
         "/setlimit <limit> - Set the maximum number of bot uses per user (admin only).\n"
         "/attack <ip> <port> <time> - Launch an attack (approved users only).\n"
         "/details - Show user statistics (admin only).\n"
         "/setcooldown <seconds> - Set cooldown time after each attack (admin only).\n"
+    )
+    await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+
+async def details(update: Update, context: CallbackContext):
+    """Show user statistics (admin only)."""
+    chat_id = update.effective_chat.id
+
+    if not await is_admin(chat_id):
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Only admins can use this command.*", parse_mode='Markdown')
+        return
+
+    total_approved = len(approved_ids)
+    total_users = len(user_usage)
+    message = (
+        f"*User Statistics:*\n\n"
+        f"Total Approved IDs: {total_approved}\n"
+        f"Total Registered Users: {total_users}\n"
+        "\nUse /help for more details on commands."
     )
     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
 
@@ -120,30 +138,7 @@ async def setlimit(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=chat_id, text=f"*✅ Bot usage limit set to {limit} per user per day.*", parse_mode='Markdown')
 
 async def approve(update: Update, context: CallbackContext):
-    """Approve a user or group ID for a set period."""
-    chat_id = update.effective_chat.id
-    args = context.args
-
-    if not await is_admin(chat_id):
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Only admins can use this command.*", parse_mode='Markdown')
-        return
-
-    if len(args) != 2:
-        await context.bot.send_message(chat_id=chat_id, text="*Usage: /approve <id> <1h/1d>*", parse_mode='Markdown')
-        return
-
-    target_id, duration = args
-    if not target_id.isdigit() or duration not in ['1h', '1d']:
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Invalid input. ID must be numeric, and duration must be 1h or 1d.*", parse_mode='Markdown')
-        return
-
-    approved_ids.add(target_id)
-    save_approved_ids()
-
-    await context.bot.send_message(chat_id=chat_id, text=f"*✅ ID {target_id} approved for {duration}. Use /attack to launch an attack.*", parse_mode='Markdown')
-
-async def remove(update: Update, context: CallbackContext):
-    """Remove a user or group ID from the approved list."""
+    """Approve a user or group/chat ID."""
     chat_id = update.effective_chat.id
     args = context.args
 
@@ -152,16 +147,35 @@ async def remove(update: Update, context: CallbackContext):
         return
 
     if len(args) != 1 or not args[0].isdigit():
-        await context.bot.send_message(chat_id=chat_id, text="*Usage: /remove <id>*", parse_mode='Markdown')
+        await context.bot.send_message(chat_id=chat_id, text="*Usage: /approve <chat_id>*", parse_mode='Markdown')
+        return
+
+    target_id = args[0]
+    approved_ids.add(target_id)
+    save_approved_ids()
+
+    await context.bot.send_message(chat_id=chat_id, text=f"*✅ Chat ID {target_id} approved.*", parse_mode='Markdown')
+
+async def remove(update: Update, context: CallbackContext):
+    """Remove a user or group/chat ID from the approved list."""
+    chat_id = update.effective_chat.id
+    args = context.args
+
+    if not await is_admin(chat_id):
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Only admins can use this command.*", parse_mode='Markdown')
+        return
+
+    if len(args) != 1 or not args[0].isdigit():
+        await context.bot.send_message(chat_id=chat_id, text="*Usage: /remove <chat_id>*", parse_mode='Markdown')
         return
 
     target_id = args[0]
     if target_id in approved_ids:
         approved_ids.remove(target_id)
         save_approved_ids()
-        await context.bot.send_message(chat_id=chat_id, text=f"*✅ ID {target_id} has been removed from the approved list.*", parse_mode='Markdown')
+        await context.bot.send_message(chat_id=chat_id, text=f"*✅ Chat ID {target_id} has been removed from the approved list.*", parse_mode='Markdown')
     else:
-        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ ID {target_id} not found in the approved list.*", parse_mode='Markdown')
+        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ Chat ID {target_id} not found in the approved list.*", parse_mode='Markdown')
 
 async def attack(update: Update, context: CallbackContext):
     """Launch an attack if the user is approved and within the limits."""
@@ -229,8 +243,8 @@ def main():
     application.add_handler(CommandHandler("approve", approve))
     application.add_handler(CommandHandler("remove", remove))
     application.add_handler(CommandHandler("attack", attack))
+    application.add_handler(CommandHandler("details", details))
     application.add_handler(CommandHandler("setlimit", setlimit))
-    application.add_handler(CommandHandler("setcooldown", setlimit))  # Reusing setlimit logic
 
     application.run_polling()
 
