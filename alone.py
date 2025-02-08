@@ -64,7 +64,7 @@ async def is_member_of_channel(user_id: int, context: CallbackContext):
         return False
 
 # Helper Function: Cooldown Logic
-def can_attack(user_id, attack_time):
+def can_attack(user_id, attack_duration):
     """Check if a user can launch an attack based on cooldown."""
     global cooldown_data
     if user_id not in cooldown_data:
@@ -72,7 +72,7 @@ def can_attack(user_id, attack_time):
         return True
 
     last_attack_time = cooldown_data[user_id]
-    cooldown_period = timedelta(seconds=int(attack_time))  # Cooldown period based on attack time
+    cooldown_period = timedelta(seconds=int(attack_duration))  # Cooldown period based on attack duration
     if datetime.now() - last_attack_time >= cooldown_period:
         cooldown_data[user_id] = datetime.now()  # Reset cooldown
         return True
@@ -190,19 +190,25 @@ async def attack(update: Update, context: CallbackContext):
         await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ You must join our channel ({CHANNEL_ID}) to use this feature.*", parse_mode='Markdown')
         return
 
-    if not can_attack(user_id, args[2]):
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Cooldown period has not passed yet.*", parse_mode='Markdown')
-        return
-
-    if str(user_id) in attack_counts and attack_counts[str(user_id)] >= MAX_ATTACKS_PER_USER and user_id != ADMIN_USER_ID:
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You have exceeded the attack limit.*", parse_mode='Markdown')
-        return
-
     if len(args) != 3:
         await context.bot.send_message(chat_id=chat_id, text="*Usage: /attack <ip> <port> <time>*", parse_mode='Markdown')
         return
 
     ip, port, time = args
+    if not time.isdigit():
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Attack time must be a number!*", parse_mode='Markdown')
+        return
+
+    # Handle cooldown logic based on attack time
+    if not can_attack(user_id, time):
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Cooldown period has not passed yet.*", parse_mode='Markdown')
+        return
+
+    # Check if attack limit is reached
+    if str(user_id) in attack_counts and attack_counts[str(user_id)] >= MAX_ATTACKS_PER_USER and user_id != ADMIN_USER_ID:
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You have exceeded the attack limit.*", parse_mode='Markdown')
+        return
+
     attack_counts[str(user_id)] = attack_counts.get(str(user_id), 0) + 1
     save_attack_stats()
 
